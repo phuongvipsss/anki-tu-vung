@@ -1,7 +1,6 @@
 import fs from 'fs';
 import mammoth from 'mammoth';
-// Using require to avoid Webpack ESM default export issues on Vercel
-const pdfParse = require('pdf-parse');
+
 
 /**
  * Extracts raw text from a given file based on its extension.
@@ -16,6 +15,7 @@ export async function extractTextFromFile(filePath: string, extension: string): 
   }
   
   if (ext === 'pdf') {
+    const pdfParse = require('pdf-parse');
     const buffer = fs.readFileSync(filePath);
     const data = await pdfParse(buffer);
     return data.text;
