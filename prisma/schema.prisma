@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Settings {
+  id              Int     @id @default(1)
+  deckName        String  @default("English Vocabulary")
+  modelName       String  @default("Basic")
+  aiApiKey        String?
+  imageApiKey     String?
+  currentLevel    String  @default("A1")
+  targetLevel     String  @default("B2")
+  dailyStudyTime  Int     @default(30)
+  examGoal        String  @default("none")
+  weakSkills      String? // JSON-stringified array
+  preferredTopics String? // JSON-stringified array
+  availableDays   String? // JSON-stringified array
+}
+
+model Vocabulary {
+  id           String   @id @default(uuid())
+  word         String
+  ipa          String?
+  partOfSpeech String?
+  definitionEn String?
+  meaningVi    String?
+  examples     String?  // JSON string
+  synonyms     String?  // Comma separated
+  collocations String?  // Comma separated
+  tags         String?  // Comma separated
+  level        String?
+  reviewStatus String   @default("new")
+  addedAt      DateTime @default(now())
+
+  // New fields for Phase 1 hardening
+  addedToAnki    Boolean   @default(false)
+  ankiNoteId     String?
+  difficulty     String?
+  lastReviewedAt DateTime?
+  nextReviewAt   DateTime?
+  personalNote   String?
+
+  @@unique([word, partOfSpeech])
+}
+
+model GrammarTopic {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  progress    Int      @default(0) // 0 to 100
+  lastStudied DateTime?
+}
+
+model MistakeLog {
+  id            String   @id @default(uuid())
+  skillType     String   // "vocabulary", "grammar", "listening", etc.
+  question      String
+  userAnswer    String
+  correctAnswer String
+  explanation   String
+  date          DateTime @default(now())
+}
+
+model DailyTask {
+  id                 String   @id @default(uuid())
+  taskType           String   // @deprecated (kept for backward compatibility)
+  title              String   @default("")
+  skill              String   @default("vocabulary")
+  estimatedMinutes   Int      @default(10)
+  difficulty         String?
+  instructions       String?
+  expectedUserAction String?
+  successCriteria    String?
+  relatedMistakeIds  String?  // JSON-stringified array
+  relatedVocabIds    String?  // JSON-stringified array
+  canAddToAnki       Boolean  @default(false)
+  source             String?  @default("ai_generated") // ai_generated | manual | review | system
+  priorityScore      Int      @default(0)
+  status             String   @default("pending") // "pending", "completed", "skipped"
+  date               DateTime @default(now())
+}
+
+model ReviewItem {
+  id             String   @id @default(uuid())
+  sourceType     String   // "vocabulary", "grammar_mistake", "listening_mistake", "writing_mistake", "task"
+  sourceId       String
+  priorityScore  Int      @default(1)
+  dueDate        DateTime @default(now())
+  lastReviewedAt DateTime?
+  reviewCount    Int      @default(0)
+  confidence     String?  // "again", "hard", "good", "easy"
+  status         String   @default("pending") // "pending", "completed", "dismissed"
+  addedAt        DateTime @default(now())
+}
+
+// ==================== PHASE 2 ====================
+
+model ListeningExercise {
+  id           String   @id @default(uuid())
+  title        String
+  level        String
+  topic        String
+  transcript   String
+  audioUrl     String?
+  accent       String?
+  questions    String   // JSON string
+  gapFillItems String   // JSON string
+  createdAt    DateTime @default(now())
+}
+
+model ListeningAttempt {
+  id             String   @id @default(uuid())
+  exerciseId     String
+  userTranscript String?
+  score          Int
+  mistakes       String   // JSON string
+  completedAt    DateTime @default(now())
+}
+
+model ReadingPassage {
+  id           String   @id @default(uuid())
+  title        String
+  level        String
+  topic        String
+  passage      String
+  vocabulary   String   // JSON string
+  questions    String   // JSON string
+  createdAt    DateTime @default(now())
+}
+
+model ReadingAttempt {
+  id          String   @id @default(uuid())
+  passageId   String
+  answers     String   // JSON string
+  score       Int
+  mistakes    String   // JSON string
+  completedAt DateTime @default(now())
+}
+
+model WritingSubmission {
+  id          String   @id @default(uuid())
+  prompt      String
+  writingType String
+  userText    String
+  level       String
+  createdAt   DateTime @default(now())
+}
+
+model WritingCorrection {
+  id                String   @id @default(uuid())
+  submissionId      String
+  correctedText     String
+  naturalVersion    String
+  overallFeedbackVi String
+  estimatedLevel    String
+  errors            String   // JSON string
+  ankiCandidates    String   // JSON string
+  createdAt         DateTime @default(now())
+}
+
+// ==================== PHASE 3 ====================
+
+model Resource {
+  id            String   @id @default(uuid())
+  type          String   // document | youtube | webpage | manual
+  title         String
+  sourceUrl     String?
+  localFilePath String?
+  fileType      String?
+  topic         String?
+  skill         String?
+  level         String?
+  qualityScore  Int?
+  summary       String?
+  status        String   @default("imported") // imported | analyzed | selected | archived
+  
+  // Specific to YouTube/Web
+  channelTitle  String?
+  thumbnailUrl  String?
+  duration      String?
+  publishedAt   String?
+  snippet       String?
+  sourceDomain  String?
+  reasonVi      String?
+
+  chunks        ResourceChunk[]
+  lessons       Lesson[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ResourceChunk {
+  id             String   @id @default(uuid())
+  resourceId     String
+  resource       Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  chunkIndex     Int
+  text           String
+  tokenCount     Int
+  summary        String?
+  keyVocabulary  String?  // JSON string
+  grammarPoints  String?  // JSON string
+  createdAt      DateTime @default(now())
+}
+
+model Lesson {
+  id               String   @id @default(uuid())
+  resourceId       String?
+  resource         Resource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  title            String
+  level            String
+  skill            String
+  objective        String
+  estimatedMinutes Int
+  content          String   // JSON string containing warmup, mainContent, practiceTasks, reviewItems, ankiCandidates
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  attempts         LessonAttempt[]
+}
+
+model LessonAttempt {
+  id          String   @id @default(uuid())
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  answers     String   // JSON string
+  score       Int
+  mistakes    String   // JSON string
+  completedAt DateTime @default(now())
+}
+
+model Curriculum {
+  id          String   @id @default(uuid())
+  title       String
+  targetLevel String
+  durationDays Int
+  mainGoal    String
+  plan        String   // JSON string containing weeklyFocus, dailyPlan, milestones
+  createdAt   DateTime @default(now())
+}
