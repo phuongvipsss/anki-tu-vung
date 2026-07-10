@@ -1,7 +1,7 @@
 import fs from 'fs';
 import mammoth from 'mammoth';
-// @ts-expect-error - The @types/pdf-parse doesn't export a default but the CJS module does
-import pdfParse from 'pdf-parse';
+// Using require to avoid Webpack ESM default export issues on Vercel
+const pdfParse = require('pdf-parse');
 
 /**
  * Extracts raw text from a given file based on its extension.
